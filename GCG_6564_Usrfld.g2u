@@ -1,0 +1,225 @@
+﻿Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+Function.Intrinsic.UI.UsePixels ' Allows you to use Pixels instead of Twips throughout
+
+
+v.Local.ssql.Declare
+v.Local.sOrderno.Declare
+v.Local.sOrderLine.Declare
+v.Local.sUsrfld1.Declare
+v.Local.sUsrfld2.Declare
+
+v.Local.sJob.Declare
+v.Local.sSuffix.Declare
+V.Local.sFolder.Declare
+v.local.bRet.Declare
+v.local.sFilname.Declare
+v.local.sShift.Declare
+V.Local.sLines.Declare
+V.Local.iCnt.Declare
+V.Local.sPO.Declare
+
+f.Intrinsic.Control.If(v.Caller.Hook,=,12340)
+   'for BOM capture lineno
+	f.Intrinsic.String.LPad(Variable.Passed.000051,"0",3,v.Local.sOrderLine)
+	f.Intrinsic.String.RPad(v.Local.sOrderLine,"0",4,v.Local.sOrderLine)
+	v.Passed.global.Set(v.Local.sOrderLine)
+f.Intrinsic.Control.elseIf(v.Caller.Hook,=,16800)
+'WO Save
+'Variable.Passed.009000
+'Variable.Passed.009001
+
+	F.ODBC.Connection!conx.OpenCompanyConnection(300)
+	
+	f.Intrinsic.String.LPad(Variable.Passed.009000,"0",7,v.Local.sOrderno)
+	f.Intrinsic.String.RPad(Variable.Passed.009001,"0",4,v.Local.sOrderLine)
+	
+	f.Intrinsic.String.Build("select user_4,user_5 from v_order_lines where order_no = '{0}' and record_no = '{1}'",v.Local.sOrderno,v.Local.sOrderLine,v.Local.ssql)
+	F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst",V.Local.ssql)
+	F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF,=,False)
+		v.Local.sUsrfld1.Set(V.ODBC.conx!rst.FieldValTrim!user_4)
+		v.Local.sUsrfld2.Set(V.ODBC.conx!rst.FieldValTrim!user_5)
+		
+		f.Intrinsic.String.Build("select * from WO_USER_FLDS where JOB = '{0}' and Suffix = '{1}'",Variable.Passed.009000,Variable.Passed.009001,v.Local.ssql)
+		F.ODBC.Connection!conx.OpenLocalRecordsetRW("rst1",V.Local.ssql)
+		F.Intrinsic.Control.If(V.ODBC.conx!rst1.EOF,=,True)
+			F.ODBC.conx!rst1.AddNew
+			F.ODBC.conx!rst1.Set!job(Variable.Passed.009000)
+			F.ODBC.conx!rst1.Set!suffix(Variable.Passed.009001)
+		F.Intrinsic.Control.EndIf
+		F.ODBC.conx!rst1.Set!user_1(v.Local.sUsrfld1)
+		F.ODBC.conx!rst1.Set!user_2(v.Local.sUsrfld2)
+		F.ODBC.conx!rst1.Update
+		F.ODBC.conx!rst1.Close
+		
+	F.Intrinsic.Control.EndIf
+	F.ODBC.conx!rst.Close
+	
+	F.ODBC.Connection!conx.Close
+
+f.Intrinsic.Control.elseIf(v.Caller.Hook,=,17261)
+'BOM Save
+'Variable.Passed.009002  - SO
+'Variable.Passed.009000 - WO
+'Variable.Passed.009001 - suffix
+
+
+	F.ODBC.Connection!conx.OpenCompanyConnection(300)
+	
+	f.Intrinsic.String.LPad(Variable.Passed.009002,"0",7,v.Local.sOrderno)
+	v.Local.sOrderLine.Set(Variable.Passed.Global)
+	
+	f.Intrinsic.String.Build("select user_4,user_5 from v_order_lines where order_no = '{0}' and record_no = '{1}'",v.Local.sOrderno,v.Local.sOrderLine,v.Local.ssql)
+	F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst",V.Local.ssql)
+	F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF,=,False)
+		v.Local.sUsrfld1.Set(V.ODBC.conx!rst.FieldValTrim!user_4)
+		v.Local.sUsrfld2.Set(V.ODBC.conx!rst.FieldValTrim!user_5)
+		
+		f.Intrinsic.String.Build("select suffix from v_job_header where JOB = '{0}'",Variable.Passed.009000,v.Local.ssql)
+		F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst2",V.Local.ssql)
+		F.Intrinsic.Control.DoUntil(V.ODBC.conX!rst2.EOF,=,True)
+			v.Local.sSuffix.Set(V.ODBC.conx!rst2.FieldValTrim!suffix)
+			f.Intrinsic.String.Build("select * from WO_USER_FLDS where JOB = '{0}' and Suffix = '{1}'",Variable.Passed.009000,v.Local.sSuffix,v.Local.ssql)
+			F.ODBC.Connection!conx.OpenLocalRecordsetRW("rst1",V.Local.ssql)
+			F.Intrinsic.Control.If(V.ODBC.conx!rst1.EOF,=,True)
+				F.ODBC.conx!rst1.AddNew
+				F.ODBC.conx!rst1.Set!job(Variable.Passed.009000)
+				F.ODBC.conx!rst1.Set!suffix(v.Local.sSuffix)
+			F.Intrinsic.Control.EndIf
+			F.ODBC.conx!rst1.Set!user_1(v.Local.sUsrfld1)
+			F.ODBC.conx!rst1.Set!user_2(v.Local.sUsrfld2)
+			F.ODBC.conx!rst1.Update
+			F.ODBC.conx!rst1.Close
+			F.ODBC.conx!rst2.MoveNext
+		Function.Intrinsic.Control.Loop
+		F.ODBC.conx!rst2.Close
+	F.Intrinsic.Control.EndIf
+	F.ODBC.conx!rst.Close
+	F.ODBC.Connection!conx.Close
+	
+f.Intrinsic.Control.elseIf(v.Caller.Hook,=,17060)	
+'PO Lines Pre Save
+'Variable.Passed.000029
+'Variable.Passed.000030 001
+	f.Intrinsic.Control.If(Variable.Passed.000029.trim,=,"")
+		f.Intrinsic.Control.ExitSub
+	f.Intrinsic.Control.EndIf
+	
+	'Edit by BixRB, making it so the WO.new file can store more records so if multiple PO Lines are created before closing, it will update them all
+	
+	f.Intrinsic.String.Build("{0}\WO.new",v.Caller.LocalGSSTempDir,v.local.sFilname)
+	F.Intrinsic.File.Exists(V.Local.sFilname,V.Local.bRet)
+	F.Intrinsic.Control.If(V.Local.bRet)
+		F.Intrinsic.File.File2String(V.Local.sFilname,V.Local.sJob)
+		F.Intrinsic.String.Build("{0}{1}",V.Local.sJob,V.Ambient.NewLine,V.Local.sJob)
+	F.Intrinsic.Control.EndIf
+	
+	'"WO" *!* Job *!* Job Suffix *!* PO Line (4 chars)
+	f.Intrinsic.String.Build("{3}WO*!*{0}*!*{1}*!*{4}*!*{2}",Variable.Passed.000029,Variable.Passed.000030,Variable.Passed.008001,V.Local.sJob,V.Passed.008002,v.Local.sJob)
+	Variable.Passed.Global.Set("WO")
+
+	'17050 pop
+	F.Intrinsic.File.String2File(V.local.sFilname,v.Local.sJob)
+f.Intrinsic.Control.elseIf(v.Caller.Hook,=,15170)
+'save new PO & Auto Purchase
+
+'	f.Intrinsic.Control.If(Variable.Passed.Global,=,"WO")
+		F.ODBC.Connection!conx.OpenCompanyConnection(300)	
+		f.Intrinsic.String.Build("select job,suffix,Record_no from v_PO_LINES where Purchase_order = '{0}'",Variable.Passed.009000,v.Local.ssql)
+		F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst2",V.Local.ssql)
+		F.Intrinsic.Control.DoUntil(V.ODBC.conX!rst2.EOF,=,True)
+			f.Intrinsic.String.Build("select user_1,user_2 from WO_USER_FLDS where JOB = '{0}' and Suffix = '000'",V.ODBC.conx!rst2.FieldValTrim!job,v.Local.ssql)
+			F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst",V.Local.ssql)
+			F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF,=,False)
+				v.Local.sUsrfld1.Set(V.ODBC.conx!rst.FieldValTrim!user_1)
+				v.Local.sUsrfld2.Set(V.ODBC.conx!rst.FieldValTrim!user_2)
+			f.Intrinsic.Control.Else
+				F.ODBC.conx!rst.Close
+				f.Intrinsic.String.Build("select user_1,user_2 from WO_USER_FLDS where JOB = '{0}' and Suffix = '{1}'",V.ODBC.conx!rst2.FieldValTrim!job,V.ODBC.conx!rst2.FieldValTrim!suffix,v.Local.ssql)
+				F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst",V.Local.ssql)
+				F.Intrinsic.Control.If(V.ODBC.conx!rst.EOF,=,False)
+					v.Local.sUsrfld1.Set(V.ODBC.conx!rst.FieldValTrim!user_1)
+					v.Local.sUsrfld2.Set(V.ODBC.conx!rst.FieldValTrim!user_2)
+				F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.EndIf
+			f.Intrinsic.String.Build("update PO_LINES set User_1='{2}',User_2='{3}' where Purchase_order = '{0}' and Record_no = '{1}'",Variable.Passed.009000,V.ODBC.conx!rst2.FieldValTrim!Record_no,v.Local.sUsrfld1,v.Local.sUsrfld2,v.Local.ssql)
+			f.ODBC.Connection!conx.Execute(v.Local.ssql)
+			F.ODBC.conx!rst.Close
+			F.ODBC.conx!rst2.MoveNext
+		Function.Intrinsic.Control.Loop
+		F.ODBC.conx!rst2.Close
+		F.ODBC.Connection!conx.Close
+		Variable.Passed.Global.Set("")
+		f.Intrinsic.String.Build("{0}\WO.new",v.Caller.LocalGSSTempDir,v.local.sFilname)
+		f.Intrinsic.File.exists(V.Local.sFilname,v.local.bRet)
+		f.Intrinsic.Control.If(v.local.bRet,=,true)
+			f.Intrinsic.File.DeleteFile(V.local.sFilname)
+		f.Intrinsic.Control.EndIf 
+'	F.Intrinsic.Control.EndIf
+'f.Intrinsic.Control.elseIf(v.Caller.Hook,=,17050,"or",v.Caller.Hook,=,17150)
+'f.Intrinsic.Control.elseIf(v.Caller.Hook,=,17010)
+f.Intrinsic.Control.elseIf(v.Caller.Hook,=,16880,or,V.Caller.Hook,=,16860)
+
+	'PO lines pre exit doesn't work, we need to update this when they save the PO or exit the PO header
+	f.Intrinsic.Control.If(V.Passed.Global,=,"WO")
+'		F.Intrinsic.String.Build("{0}-{1}",Variable.Passed.008002,Variable.Passed.008001,V.Local.sFilname)
+		f.Intrinsic.String.Build("{0}\WO.new",v.Caller.LocalGSSTempDir,v.local.sFilname)
+		f.Intrinsic.File.exists(V.Local.sFilname,v.local.bRet)
+		f.Intrinsic.Control.If(v.local.bRet,=,False)
+			f.Intrinsic.Control.ExitSub
+		f.Intrinsic.Control.EndIf 
+		F.Intrinsic.File.File2String(V.local.sFilname,v.local.sJob)
+		
+		'Edited by BixRB 12 Aug 2022 - make this work with multiple PO Lines on one screen session
+		F.Intrinsic.String.Split(V.Local.sJob,V.Ambient.NewLine,V.Local.sLines)
+		F.ODBC.Connection!conx.OpenCompanyConnection(300)
+		
+		F.Intrinsic.Control.For(V.Local.iCnt,0,V.Local.sLines.UBound,1)
+			f.Intrinsic.String.Split(v.Local.sLines,"*!*",v.Local.sJob)
+			'1 - Job
+			'2 - Suffix
+			'3 - PO
+			'4 - PO Line (4 chars)
+			f.Intrinsic.String.Build("select user_1,user_2 from WO_USER_FLDS where JOB = '{0}' and Suffix = '000'",v.Local.sJob(1),v.Local.ssql)
+			F.ODBC.Connection!conx.OpenLocalRecordsetRO("rst000",V.Local.ssql)
+			F.Intrinsic.Control.If(V.ODBC.conx!rst000.EOF,=,False)
+				v.Local.sUsrfld1.Set(V.ODBC.conx!rst000.FieldValTrim!user_1)
+				v.Local.sUsrfld2.Set(V.ODBC.conx!rst000.FieldValTrim!user_2)
+			f.Intrinsic.Control.Else
+				f.Intrinsic.String.Build("select user_1,user_2 from WO_USER_FLDS where JOB = '{0}' and Suffix = '{1}'",v.Local.sJob(1),v.Local.sJob(2),v.Local.ssql)
+				F.ODBC.Connection!conx.OpenLocalRecordsetRO("rstNum",V.Local.ssql)
+				F.Intrinsic.Control.If(V.ODBC.conx!rstNum.EOF,=,False)
+					v.Local.sUsrfld1.Set(V.ODBC.conx!rstNum.FieldValTrim!user_1)
+					v.Local.sUsrfld2.Set(V.ODBC.conx!rstNum.FieldValTrim!user_2)
+				F.Intrinsic.Control.EndIf
+				F.ODBC.conx!rstNum.Close
+			F.Intrinsic.Control.EndIf
+			F.ODBC.conx!rst000.Close
+			
+'			F.Intrinsic.String.LPad(V.Passed.000008,"0",7,V.Local.sPO)
+			f.Intrinsic.String.Build("select user_1,user_2 from v_PO_LINES where Purchase_order = '{0}' and Record_no = '{1}'",V.Local.sJob(3),v.Local.sJob(4),v.Local.ssql)
+			
+			F.ODBC.Connection!conx.OpenLocalRecordsetRO("rstPO",V.Local.ssql)
+			F.Intrinsic.Control.If(V.ODBC.conx!rstPO.EOF,=,False)
+				f.Intrinsic.String.Build("update PO_LINES set User_1='{2}',User_2='{3}' where Purchase_order = '{0}' and Record_no = '{1}'",V.Local.sJob(3),v.Local.sJob(4),v.Local.sUsrfld1,v.Local.sUsrfld2,v.Local.ssql)
+				f.ODBC.Connection!conx.Execute(v.Local.ssql)
+				Variable.Passed.Global.Set("")
+			F.Intrinsic.Control.EndIf
+			F.ODBC.conx!rstPO.Close
+		F.Intrinsic.Control.Next(V.Local.iCnt)
+		f.Intrinsic.File.DeleteFile(V.local.sFilname)
+		
+		F.ODBC.Connection!conx.Close
+	f.Intrinsic.Control.EndIf
+f.Intrinsic.Control.elseIf(v.Caller.Hook,=,56312)
+'Auto Purchase
+
+f.Intrinsic.Control.EndIf
+Program.Sub.Main.End
+
+Program.Sub.Comments.Start
+${$5$}$20.1.8256.24238$}$1
+${$6$}$bbaker$}$20220907122640535$}$pM7xsHplA2E9VCTenDTJ47gi1rF/t66WjG1C7K2ZJqXxIVAewcLllkWMbVlJ/cmQyupu1vVX+6s=
+Program.Sub.Comments.End
